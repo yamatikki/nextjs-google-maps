@@ -11,6 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import {Dispatch, SetStateAction} from "react"
+import {ptBR} from "react-day-picker/locale"
 
 export function DatePicker({date, setDate} : {date : Date | undefined, setDate : Dispatch<SetStateAction<Date | undefined>>}) {
   return (
@@ -21,7 +22,7 @@ export function DatePicker({date, setDate} : {date : Date | undefined, setDate :
           data-empty={!date}
           className="w-[212px] justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
         >
-          {date ? format(date, "PPP") : <span>Escolha uma data</span>}
+          {date ? format(date, "PPP", {locale: ptBR}) : <span>Escolha uma data</span>}
           <ChevronDownIcon />
         </Button>
       </PopoverTrigger>
@@ -29,8 +30,10 @@ export function DatePicker({date, setDate} : {date : Date | undefined, setDate :
         <Calendar
           mode="single"
           selected={date}
+          captionLayout="dropdown"
           onSelect={setDate}
           defaultMonth={date}
+          locale={ptBR}
         />
       </PopoverContent>
     </Popover>
