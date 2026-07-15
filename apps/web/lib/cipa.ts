@@ -74,3 +74,76 @@ export async function excluirOcorrencia(sistema: Sistema, id: number): Promise<v
   const res = await fetch(`${base(sistema)}/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Falha ao excluir ocorrência (${res.status})`);
 }
+
+// ===== KPI (horas-homem / dias perdidos) — só trabalho =====
+
+export type Kpi = { horas_homem: number; dias_perdidos: number };
+
+export async function obterKpi(ano: number, mes: number): Promise<Kpi> {
+  const res = await fetch(`${API_URL}/cipa/trabalho/kpi?ano=${ano}&mes=${mes}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Falha ao carregar horas/dias (${res.status})`);
+  return res.json();
+}
+
+export async function salvarKpi(dados: Kpi & { ano: number; mes: number }): Promise<void> {
+  const res = await fetch(`${API_URL}/cipa/trabalho/kpi`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  if (!res.ok) throw new Error(`Falha ao salvar horas/dias (${res.status})`);
+}
+
+// ===== Painel (telas de TV) =====
+
+export type Contagem = {
+  atual: number;
+  recorde: number;
+  ultimo: string | null;
+  inicio: string;
+};
+
+export type KpiMesPainel = {
+  horas_homem: number;
+  dias_perdidos: number;
+  acid_com: number;
+  acid_sem: number;
+  total: number;
+  taxa_freq: number;
+  taxa_freq_com: number;
+  taxa_freq_sem: number;
+  taxa_grav: number;
+};
+
+export type KpiAnoItem = {
+  mes: number;
+  com: number;
+  sem: number;
+  taxa_freq_com: number;
+  taxa_freq_sem: number;
+  taxa_grav: number;
+};
+
+export type Painel = {
+  ano: number;
+  mes: number;
+  ocorrencias_mes: Ocorrencia[];
+  contagem: Contagem;
+  // só trabalho:
+  kpi_mes?: KpiMesPainel;
+  kpi_ano?: KpiAnoItem[];
+  // só público:
+  resumo_tipo?: { acidente: number; incidente: number };
+  categorias_mes?: Record<string, number>;
+  categorias_ano?: Record<string, number[]>;
+};
+
+export async function obterPainel(sistema: Sistema, ano: number, mes: number): Promise<Painel> {
+  const res = await fetch(`${API_URL}/cipa/${sistema}/painel?ano=${ano}&mes=${mes}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Falha ao carregar painel (${res.status})`);
+  return res.json();
+}

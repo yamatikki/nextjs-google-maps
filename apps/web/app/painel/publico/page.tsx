@@ -12,6 +12,7 @@ export default function PainelPublico() {
       titulo="PÚBLICO FLUTUANTE"
       labelRed="Ocorrências graves"
       labelYellow="Ocorrências leves"
+      streakLabel="Dias consecutivos sem ocorrência"
     />
   );
 }

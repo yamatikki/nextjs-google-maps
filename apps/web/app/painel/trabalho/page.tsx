@@ -12,6 +12,7 @@ export default function PainelTrabalho() {
       titulo="ACIDENTES DE TRABALHO"
       labelRed="Acidentes c/ afast."
       labelYellow="Acidentes s/ afast."
+      streakLabel="Dias consecutivos sem acidente de trabalho"
     />
   );
 }

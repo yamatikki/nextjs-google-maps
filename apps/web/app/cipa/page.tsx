@@ -41,6 +41,24 @@ export default function CipaPage() {
           </span>
         </Link>
       </div>
+
+      {/* Painéis para exibição nas TVs (abrem em nova aba, tela cheia) */}
+      <div className="flex flex-wrap justify-center gap-6 text-sm">
+        <Link
+          href="/painel/trabalho"
+          target="_blank"
+          className="font-medium text-green-700 hover:underline"
+        >
+          📺 Painel TV — Acidentes de Trabalho
+        </Link>
+        <Link
+          href="/painel/publico"
+          target="_blank"
+          className="font-medium text-blue-700 hover:underline"
+        >
+          📺 Painel TV — Público Flutuante
+        </Link>
+      </div>
     </main>
   );
 }

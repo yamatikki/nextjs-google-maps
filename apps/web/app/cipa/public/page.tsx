@@ -195,6 +195,13 @@ export default function PublicPage() {
               ))}
             </select>
           </div>
+          <Link
+            href="/painel/publico"
+            target="_blank"
+            className="rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
+          >
+            📺 Painel TV
+          </Link>
         </div>
       </div>
 

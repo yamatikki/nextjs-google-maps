@@ -25,6 +25,18 @@ await sql`
   )
 `;
 
+// KPI mensal do sistema "trabalho": horas-homem e dias perdidos.
+// PRIMARY KEY (ano, mes) garante 1 linha por mês (o salvar faz "upsert").
+await sql`
+  CREATE TABLE IF NOT EXISTS kpi_trabalho (
+    ano           INTEGER NOT NULL,
+    mes           INTEGER NOT NULL,
+    horas_homem   INTEGER NOT NULL DEFAULT 0,
+    dias_perdidos INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (ano, mes)
+  )
+`;
+
 export type Sistema = "trabalho" | "publico";
 
 export type Ocorrencia = {
@@ -96,4 +108,51 @@ export async function atualizarOcorrencia(
 export async function excluirOcorrencia(sistema: Sistema, id: number): Promise<boolean> {
   const rows = await sql`DELETE FROM ocorrencias WHERE id = ${id} AND sistema = ${sistema} RETURNING id`;
   return rows.length > 0;
+}
+
+// ===== KPI (horas-homem / dias perdidos) — só para o sistema "trabalho" =====
+
+export type Kpi = { horas_homem: number; dias_perdidos: number };
+
+export async function obterKpi(ano: number, mes: number): Promise<Kpi> {
+  const [row] = await sql`
+    SELECT horas_homem, dias_perdidos FROM kpi_trabalho WHERE ano = ${ano} AND mes = ${mes}
+  `;
+  return (row as Kpi) ?? { horas_homem: 0, dias_perdidos: 0 };
+}
+
+export async function salvarKpi(ano: number, mes: number, k: Kpi): Promise<void> {
+  await sql`
+    INSERT INTO kpi_trabalho (ano, mes, horas_homem, dias_perdidos)
+    VALUES (${ano}, ${mes}, ${k.horas_homem}, ${k.dias_perdidos})
+    ON CONFLICT (ano, mes) DO UPDATE
+      SET horas_homem = EXCLUDED.horas_homem, dias_perdidos = EXCLUDED.dias_perdidos
+  `;
+}
+
+export async function listarKpisAno(ano: number): Promise<(Kpi & { mes: number })[]> {
+  return (await sql`
+    SELECT mes, horas_homem, dias_perdidos FROM kpi_trabalho WHERE ano = ${ano}
+  `) as (Kpi & { mes: number })[];
+}
+
+// ===== Consultas de apoio ao painel (TV) =====
+
+export async function listarOcorrenciasAno(sistema: Sistema, ano: number): Promise<Ocorrencia[]> {
+  return (await sql`
+    SELECT ${COLUNAS} FROM ocorrencias
+    WHERE sistema = ${sistema} AND ano = ${ano}
+    ORDER BY mes, dia, id
+  `) as Ocorrencia[];
+}
+
+// Todas as datas (distintas) que tiveram ocorrência — para a contagem de
+// "dias consecutivos sem ocorrência" e o recorde.
+export async function listarDatasOcorrencias(
+  sistema: Sistema,
+): Promise<{ ano: number; mes: number; dia: number }[]> {
+  return (await sql`
+    SELECT DISTINCT ano, mes, dia FROM ocorrencias WHERE sistema = ${sistema}
+    ORDER BY ano, mes, dia
+  `) as { ano: number; mes: number; dia: number }[];
 }

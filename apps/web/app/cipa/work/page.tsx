@@ -10,7 +10,10 @@ import {
   criarOcorrencia,
   atualizarOcorrencia,
   excluirOcorrencia,
+  obterKpi,
+  salvarKpi,
   type Gravidade,
+  type Kpi,
   type Ocorrencia,
 } from "@/lib/cipa";
 
@@ -25,9 +28,9 @@ export default function WorkPage() {
   const [aba, setAba] = useState<"cruz" | "freq">("cruz");
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
   const [erro, setErro] = useState<string | null>(null);
-  // Horas-homem e dias perdidos por mês — AINDA só em memória (o back ainda não
-  // tem endpoint de KPI). As ocorrências, sim, são salvas no banco.
-  const [kpis, setKpis] = useState<Record<string, { horas: number; dias: number }>>({});
+  // Horas-homem e dias perdidos do mês (persistidos no banco via API).
+  const [kpiMes, setKpiMes] = useState<Kpi>({ horas_homem: 0, dias_perdidos: 0 });
+  const [kpiMsg, setKpiMsg] = useState("");
 
   // ---- Estado do modal ----
   const [diaAberto, setDiaAberto] = useState<number | null>(null);
@@ -37,14 +40,16 @@ export default function WorkPage() {
   const [formDesc, setFormDesc] = useState("");
   const [formObs, setFormObs] = useState("");
 
-  const chaveMes = `${ano}-${mes}`;
-  const kpiMes = kpis[chaveMes] ?? { horas: 0, dias: 0 };
-
-  // Carrega as ocorrências do mês a partir da API.
+  // Carrega as ocorrências + horas/dias do mês a partir da API.
   const carregar = useCallback(async () => {
     try {
       setErro(null);
-      setOcorrencias(await listarOcorrencias("trabalho", ano, mes));
+      const [occ, kpi] = await Promise.all([
+        listarOcorrencias("trabalho", ano, mes),
+        obterKpi(ano, mes),
+      ]);
+      setOcorrencias(occ);
+      setKpiMes(kpi);
     } catch (e) {
       console.error(e);
       setErro("Não foi possível carregar do servidor. A API (porta 3001) está no ar?");
@@ -63,14 +68,14 @@ export default function WorkPage() {
     const com = ocorrencias.filter((o) => o.gravidade === "red").length;
     const sem = ocorrencias.filter((o) => o.gravidade === "yellow").length;
     const total = com + sem;
-    const horas = kpiMes.horas || HORAS_PADRAO;
+    const horas = kpiMes.horas_homem || HORAS_PADRAO;
     const taxa = (n: number) => (horas ? +((n * 1_000_000) / horas).toFixed(2) : 0);
     return {
       com, sem, total,
       freq: taxa(total),
       freqCom: taxa(com),
       freqSem: taxa(sem),
-      grav: taxa(kpiMes.dias), // taxa de gravidade usa os dias perdidos
+      grav: taxa(kpiMes.dias_perdidos), // taxa de gravidade usa os dias perdidos
     };
   }, [ocorrencias, kpiMes]);
 
@@ -128,11 +133,18 @@ export default function WorkPage() {
       setErro("Não foi possível excluir.");
     }
   }
-  function setKpiCampo(campo: "horas" | "dias", valor: number) {
-    setKpis((prev) => ({
-      ...prev,
-      [chaveMes]: { ...(prev[chaveMes] ?? { horas: 0, dias: 0 }), [campo]: valor },
-    }));
+  function setKpiCampo(campo: "horas_homem" | "dias_perdidos", valor: number) {
+    setKpiMes((prev) => ({ ...prev, [campo]: valor }));
+  }
+  async function salvarHorasDias() {
+    try {
+      await salvarKpi({ ano, mes, ...kpiMes });
+      setKpiMsg("✓ Salvo!");
+      setTimeout(() => setKpiMsg(""), 2500);
+    } catch (e) {
+      console.error(e);
+      setErro("Não foi possível salvar horas/dias.");
+    }
   }
 
   return (
@@ -171,6 +183,13 @@ export default function WorkPage() {
               ))}
             </select>
           </div>
+          <Link
+            href="/painel/trabalho"
+            target="_blank"
+            className="rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
+          >
+            📺 Painel TV
+          </Link>
         </div>
       </div>
 
@@ -235,8 +254,8 @@ export default function WorkPage() {
               <input
                 type="number"
                 min={0}
-                value={kpiMes.horas || ""}
-                onChange={(e) => setKpiCampo("horas", +e.target.value)}
+                value={kpiMes.horas_homem || ""}
+                onChange={(e) => setKpiCampo("horas_homem", +e.target.value)}
                 placeholder={`${HORAS_PADRAO}`}
                 className="w-full rounded-md border border-green-300 p-2"
               />
@@ -248,8 +267,8 @@ export default function WorkPage() {
               <input
                 type="number"
                 min={0}
-                value={kpiMes.dias || ""}
-                onChange={(e) => setKpiCampo("dias", +e.target.value)}
+                value={kpiMes.dias_perdidos || ""}
+                onChange={(e) => setKpiCampo("dias_perdidos", +e.target.value)}
                 className="w-full rounded-md border border-green-300 p-2"
               />
             </div>
@@ -266,6 +285,15 @@ export default function WorkPage() {
               <div>Taxa Freq. s/ afastamento: <b className="text-green-900">{calc.freqSem}</b></div>
               <div>Taxa de Gravidade: <b className="text-green-900">{calc.grav}</b></div>
             </div>
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={salvarHorasDias}
+              className="rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:brightness-95"
+            >
+              Salvar horas/dias
+            </button>
+            {kpiMsg && <span className="text-sm font-semibold text-green-700">{kpiMsg}</span>}
           </div>
           <p className="mt-3 text-xs text-gray-400">
             As taxas se atualizam sozinhas conforme você marca a cruz e informa horas/dias.

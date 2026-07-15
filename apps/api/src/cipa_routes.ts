@@ -4,7 +4,10 @@ import {
   criarOcorrencia,
   atualizarOcorrencia,
   excluirOcorrencia,
+  obterKpi,
+  salvarKpi,
 } from "./cipa_db";
+import { montarPainel } from "./cipa_painel";
 
 // Validação do "sistema" na URL: só aceita 'trabalho' ou 'publico'.
 const sistemaParam = t.Union([t.Literal("trabalho"), t.Literal("publico")]);
@@ -22,6 +25,44 @@ const corpoOcorrencia = t.Object({
 });
 
 const cipaRoutes = new Elysia({ prefix: "/cipa" })
+  // Painel (telas de TV): ocorrências do mês + contagem de dias + agregações do ano
+  .get(
+    "/:sistema/painel",
+    ({ params, query }) => montarPainel(params.sistema, query.ano, query.mes),
+    {
+      params: t.Object({ sistema: sistemaParam }),
+      query: t.Object({ ano: t.Number(), mes: t.Number() }),
+      detail: { summary: "Dados agregados para o painel de TV", tags: ["cipa"] },
+    },
+  )
+  // KPI (horas-homem / dias perdidos) do mês — só trabalho
+  .get(
+    "/trabalho/kpi",
+    ({ query }) => obterKpi(query.ano, query.mes),
+    {
+      query: t.Object({ ano: t.Number(), mes: t.Number() }),
+      detail: { summary: "Horas-homem e dias perdidos do mês", tags: ["cipa"] },
+    },
+  )
+  .put(
+    "/trabalho/kpi",
+    async ({ body }) => {
+      await salvarKpi(body.ano, body.mes, {
+        horas_homem: body.horas_homem,
+        dias_perdidos: body.dias_perdidos,
+      });
+      return { ok: true };
+    },
+    {
+      body: t.Object({
+        ano: t.Number(),
+        mes: t.Number(),
+        horas_homem: t.Number(),
+        dias_perdidos: t.Number(),
+      }),
+      detail: { summary: "Salva horas-homem e dias perdidos do mês", tags: ["cipa"] },
+    },
+  )
   // Listar ocorrências de um mês
   .get(
     "/:sistema/ocorrencias",
