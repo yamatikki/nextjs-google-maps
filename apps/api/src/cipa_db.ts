@@ -87,16 +87,21 @@ export type OcorrenciaEntrada = {
 // Colunas devolvidas ao site (na ordem do tipo Ocorrencia).
 const COLUNAS = sql`id, sistema, ano, mes, dia, gravidade, tipo, categoria, descricao, observacoes`;
 
+// IMPORTANTE: as listas são copiadas com [...] porque o resultado cru do
+// Bun.SQL é um array "especial" que o Elysia serializa por um atalho que
+// PULA o plugin de CORS — o navegador então bloqueia a resposta.
 export async function listarOcorrencias(
   sistema: Sistema,
   ano: number,
   mes: number,
 ): Promise<Ocorrencia[]> {
-  return (await sql`
-    SELECT ${COLUNAS} FROM ocorrencias
-    WHERE sistema = ${sistema} AND ano = ${ano} AND mes = ${mes}
-    ORDER BY dia, id
-  `) as Ocorrencia[];
+  return [
+    ...(await sql`
+      SELECT ${COLUNAS} FROM ocorrencias
+      WHERE sistema = ${sistema} AND ano = ${ano} AND mes = ${mes}
+      ORDER BY dia, id
+    `),
+  ] as Ocorrencia[];
 }
 
 export async function criarOcorrencia(sistema: Sistema, o: OcorrenciaEntrada): Promise<Ocorrencia> {
@@ -151,9 +156,9 @@ export async function salvarKpi(ano: number, mes: number, k: Kpi): Promise<void>
 }
 
 export async function listarKpisAno(ano: number): Promise<(Kpi & { mes: number })[]> {
-  return (await sql`
-    SELECT mes, horas_homem, dias_perdidos FROM kpi_trabalho WHERE ano = ${ano}
-  `) as (Kpi & { mes: number })[];
+  return [
+    ...(await sql`SELECT mes, horas_homem, dias_perdidos FROM kpi_trabalho WHERE ano = ${ano}`),
+  ] as (Kpi & { mes: number })[];
 }
 
 // ===== Categorias do Público Flutuante =====
@@ -174,9 +179,9 @@ function slugify(s: string) {
 }
 
 export async function listarCategorias(): Promise<Categoria[]> {
-  return (await sql`
-    SELECT chave, nome, cor FROM categorias_publico ORDER BY ordem
-  `) as Categoria[];
+  return [
+    ...(await sql`SELECT chave, nome, cor FROM categorias_publico ORDER BY ordem`),
+  ] as Categoria[];
 }
 
 // Cria (ou devolve, se a chave já existir) uma categoria a partir do nome.
@@ -198,11 +203,13 @@ export async function criarCategoria(nome: string): Promise<Categoria> {
 // ===== Consultas de apoio ao painel (TV) =====
 
 export async function listarOcorrenciasAno(sistema: Sistema, ano: number): Promise<Ocorrencia[]> {
-  return (await sql`
-    SELECT ${COLUNAS} FROM ocorrencias
-    WHERE sistema = ${sistema} AND ano = ${ano}
-    ORDER BY mes, dia, id
-  `) as Ocorrencia[];
+  return [
+    ...(await sql`
+      SELECT ${COLUNAS} FROM ocorrencias
+      WHERE sistema = ${sistema} AND ano = ${ano}
+      ORDER BY mes, dia, id
+    `),
+  ] as Ocorrencia[];
 }
 
 // Todas as datas (distintas) que tiveram ocorrência — para a contagem de
@@ -210,8 +217,10 @@ export async function listarOcorrenciasAno(sistema: Sistema, ano: number): Promi
 export async function listarDatasOcorrencias(
   sistema: Sistema,
 ): Promise<{ ano: number; mes: number; dia: number }[]> {
-  return (await sql`
-    SELECT DISTINCT ano, mes, dia FROM ocorrencias WHERE sistema = ${sistema}
-    ORDER BY ano, mes, dia
-  `) as { ano: number; mes: number; dia: number }[];
+  return [
+    ...(await sql`
+      SELECT DISTINCT ano, mes, dia FROM ocorrencias WHERE sistema = ${sistema}
+      ORDER BY ano, mes, dia
+    `),
+  ] as { ano: number; mes: number; dia: number }[];
 }
