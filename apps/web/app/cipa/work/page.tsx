@@ -184,7 +184,14 @@ export default function WorkPage() {
             </select>
           </div>
           <Link
-            href="/painel/trabalho"
+            href={`/cipa/relatorio/trabalho?ano=${ano}&mes=${mes}`}
+            target="_blank"
+            className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
+          >
+            📄 Relatório
+          </Link>
+          <Link
+            href={`/painel/trabalho?ano=${ano}&mes=${mes}`}
             target="_blank"
             className="rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
           >

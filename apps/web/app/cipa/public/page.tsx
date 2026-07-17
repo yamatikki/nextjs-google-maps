@@ -10,34 +10,15 @@ import {
   criarOcorrencia,
   atualizarOcorrencia,
   excluirOcorrencia,
+  listarCategorias,
+  criarCategoria,
+  type Categoria,
   type Gravidade,
   type Ocorrencia,
 } from "@/lib/cipa";
 
-// ===== Tipos e constantes locais =====
+// ===== Tipos locais =====
 type TipoEvento = "acidente" | "incidente";
-type Categoria = { chave: string; nome: string; cor: string };
-
-// Categorias iniciais (as mesmas do app antigo). Novas podem ser criadas.
-const CATEGORIAS_INICIAIS: Categoria[] = [
-  { chave: "ceaf", nome: "CEAF", cor: "#1565c0" },
-  { chave: "campus", nome: "Campus", cor: "#00897b" },
-  { chave: "visitas", nome: "Visitas", cor: "#6a1b9a" },
-  { chave: "outros", nome: "Outros", cor: "#546e7a" },
-];
-
-// Paleta para colorir categorias novas
-const PALETA = ["#c62828", "#ad1457", "#4527a0", "#283593", "#0277bd", "#ef6c00", "#4e342e"];
-
-// Transforma um nome em "chave" (slug): sem acentos, minúsculo, só letras/números
-function slugify(s: string) {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "") // remove os acentos separados pelo NFD
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 export default function PublicPage() {
   const hoje = new Date();
@@ -46,7 +27,7 @@ export default function PublicPage() {
   const [ano, setAno] = useState(hoje.getFullYear());
   const [mes, setMes] = useState(hoje.getMonth() + 1);
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>(CATEGORIAS_INICIAIS);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [erro, setErro] = useState<string | null>(null);
 
   // ---- Estado do modal ----
@@ -55,15 +36,20 @@ export default function PublicPage() {
   const [editId, setEditId] = useState<number | null>(null);
   const [formTipo, setFormTipo] = useState<TipoEvento>("incidente");
   const [formGrav, setFormGrav] = useState<Gravidade>("red");
-  const [formCat, setFormCat] = useState<string>(CATEGORIAS_INICIAIS[0].chave);
+  const [formCat, setFormCat] = useState<string>("");
   const [formDesc, setFormDesc] = useState("");
   const [formObs, setFormObs] = useState("");
 
-  // Carrega as ocorrências do mês a partir da API.
+  // Carrega as ocorrências do mês + as categorias a partir da API.
   const carregar = useCallback(async () => {
     try {
       setErro(null);
-      setOcorrencias(await listarOcorrencias("publico", ano, mes));
+      const [occ, cats] = await Promise.all([
+        listarOcorrencias("publico", ano, mes),
+        listarCategorias(),
+      ]);
+      setOcorrencias(occ);
+      setCategorias(cats);
     } catch (e) {
       console.error(e);
       setErro("Não foi possível carregar do servidor. A API (porta 3001) está no ar?");
@@ -114,18 +100,20 @@ export default function PublicPage() {
     setFormObs(o.observacoes);
     setMostrarForm(true);
   }
-  function novaCategoria() {
+  async function novaCategoria() {
     const nome = prompt("Nome da nova categoria:");
     if (!nome || !nome.trim()) return;
-    const chave = slugify(nome);
-    if (!chave) return;
-    if (categorias.some((c) => c.chave === chave)) {
-      setFormCat(chave); // já existe: apenas seleciona
-      return;
+    try {
+      // O servidor cria (ou devolve a existente) e ela fica salva no banco.
+      const nova = await criarCategoria(nome.trim());
+      setCategorias((prev) =>
+        prev.some((c) => c.chave === nova.chave) ? prev : [...prev, nova],
+      );
+      setFormCat(nova.chave);
+    } catch (e) {
+      console.error(e);
+      setErro("Não foi possível criar a categoria.");
     }
-    const cor = PALETA[categorias.length % PALETA.length];
-    setCategorias((prev) => [...prev, { chave, nome: nome.trim(), cor }]);
-    setFormCat(chave);
   }
   async function salvar() {
     if (diaAberto === null) return;
@@ -196,7 +184,14 @@ export default function PublicPage() {
             </select>
           </div>
           <Link
-            href="/painel/publico"
+            href={`/cipa/relatorio/publico?ano=${ano}&mes=${mes}`}
+            target="_blank"
+            className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
+          >
+            📄 Relatório
+          </Link>
+          <Link
+            href={`/painel/publico?ano=${ano}&mes=${mes}`}
             target="_blank"
             className="rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
           >

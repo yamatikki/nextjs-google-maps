@@ -1,0 +1,36 @@
+# Banco de dados do SmartCampus (CIPA) em contêiner.
+#
+# Subir:    docker compose up -d
+# Parar:    docker compose down          (os dados FICAM no volume "pgdata")
+# Zerar:    docker compose down -v       (apaga o volume — cuidado!)
+# Logs:     docker compose logs -f postgres
+#
+# Requisito: Docker instalado no WSL (sudo apt install docker.io) ou
+# Docker Desktop no Windows com integração WSL habilitada.
+#
+# ATENÇÃO: se o PostgreSQL nativo do WSL estiver rodando, a porta 5432 já está
+# ocupada — desligue-o antes: sudo systemctl disable --now postgresql
+# A API não muda nada: o DATABASE_URL em apps/api/.env já aponta para
+# postgres://smartcampus:smartcampus@localhost:5432/smartcampus
+services:
+  postgres:
+    image: postgres:18
+    container_name: smartcampus-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: smartcampus
+      POSTGRES_PASSWORD: smartcampus
+      POSTGRES_DB: smartcampus
+    ports:
+      - "5432:5432"
+    volumes:
+      # Na imagem postgres:18 o diretório de dados vive em /var/lib/postgresql
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartcampus -d smartcampus"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

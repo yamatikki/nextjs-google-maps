@@ -37,6 +37,26 @@ await sql`
   )
 `;
 
+// Categorias do Público Flutuante (CEAF, Campus... + as criadas pelo usuário).
+// "ordem" preserva a sequência de criação para exibição estável.
+await sql`
+  CREATE TABLE IF NOT EXISTS categorias_publico (
+    chave TEXT PRIMARY KEY,
+    nome  TEXT NOT NULL,
+    cor   TEXT NOT NULL,
+    ordem SERIAL
+  )
+`;
+// Semente das 4 categorias padrão (idempotente: só insere se não existirem).
+await sql`
+  INSERT INTO categorias_publico (chave, nome, cor) VALUES
+    ('ceaf', 'CEAF', '#1565c0'),
+    ('campus', 'Campus', '#00897b'),
+    ('visitas', 'Visitas', '#6a1b9a'),
+    ('outros', 'Outros', '#546e7a')
+  ON CONFLICT (chave) DO NOTHING
+`;
+
 export type Sistema = "trabalho" | "publico";
 
 export type Ocorrencia = {
@@ -134,6 +154,45 @@ export async function listarKpisAno(ano: number): Promise<(Kpi & { mes: number }
   return (await sql`
     SELECT mes, horas_homem, dias_perdidos FROM kpi_trabalho WHERE ano = ${ano}
   `) as (Kpi & { mes: number })[];
+}
+
+// ===== Categorias do Público Flutuante =====
+
+export type Categoria = { chave: string; nome: string; cor: string };
+
+// Paleta para colorir categorias novas (mesma do app antigo).
+const PALETA = ["#c62828", "#ad1457", "#4527a0", "#283593", "#0277bd", "#ef6c00", "#4e342e"];
+
+// Transforma um nome em "chave" (slug): sem acentos, minúsculo, só letras/números.
+function slugify(s: string) {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export async function listarCategorias(): Promise<Categoria[]> {
+  return (await sql`
+    SELECT chave, nome, cor FROM categorias_publico ORDER BY ordem
+  `) as Categoria[];
+}
+
+// Cria (ou devolve, se a chave já existir) uma categoria a partir do nome.
+export async function criarCategoria(nome: string): Promise<Categoria> {
+  const chave = slugify(nome);
+  if (!chave) throw new Error("Nome de categoria inválido");
+  const existentes = await listarCategorias();
+  const existente = existentes.find((c) => c.chave === chave);
+  if (existente) return existente;
+  const cor = PALETA[existentes.length % PALETA.length];
+  const [row] = await sql`
+    INSERT INTO categorias_publico (chave, nome, cor)
+    VALUES (${chave}, ${nome.trim()}, ${cor})
+    RETURNING chave, nome, cor
+  `;
+  return row as Categoria;
 }
 
 // ===== Consultas de apoio ao painel (TV) =====

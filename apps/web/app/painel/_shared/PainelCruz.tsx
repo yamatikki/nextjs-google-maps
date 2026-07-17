@@ -40,10 +40,6 @@ const COR_CAT: Record<string, string> = {
 };
 const PALETA = ["#c62828", "#ad1457", "#4527a0", "#283593", "#0277bd", "#ef6c00", "#4e342e"];
 
-const nomeCat = (chave: string) =>
-  NOME_CAT[chave] ?? chave.charAt(0).toUpperCase() + chave.slice(1);
-const corCat = (chave: string, idx: number) => COR_CAT[chave] ?? PALETA[idx % PALETA.length];
-
 function fmtBR(iso: string | null) {
   if (!iso) return null;
   const [a, m, d] = iso.split("-");
@@ -77,18 +73,19 @@ export function PainelCruz({
   labelRed,
   labelYellow,
   streakLabel,
+  ano,
+  mes,
 }: {
   sistema: Sistema;
   titulo: string;
   labelRed: string;
   labelYellow: string;
   streakLabel: string;
+  ano: number; // definidos pela página via ?ano=&mes= (padrão: mês atual)
+  mes: number;
 }) {
-  const inicio = new Date();
-  const [ano] = useState(inicio.getFullYear());
-  const [mes] = useState(inicio.getMonth() + 1);
   const [painel, setPainel] = useState<Painel | null>(null);
-  const [agora, setAgora] = useState<Date>(inicio);
+  const [agora, setAgora] = useState<Date>(() => new Date());
   const [atualizadoEm, setAtualizadoEm] = useState("—");
 
   // Busca o pacote agregado do painel na API.
@@ -132,15 +129,26 @@ export function PainelCruz({
   const dadosGrav = kpiAno.map((k, i) => ({ m: INICIAIS[i], Gravidade: k.taxa_grav }));
 
   const catAno = painel?.categorias_ano ?? {};
-  const ordemBase = ["ceaf", "campus", "visitas", "outros"];
+  // Nome/cor/ordem vêm do banco (painel.categorias); os mapas locais são
+  // apenas reserva caso o payload venha sem a lista.
+  const catsInfo = painel?.categorias ?? [];
+  const ordemBase = catsInfo.length
+    ? catsInfo.map((c) => c.chave)
+    : ["ceaf", "campus", "visitas", "outros"];
   const chavesCat = [
     ...ordemBase.filter((c) => catAno[c]),
     ...Object.keys(catAno).filter((c) => !ordemBase.includes(c)).sort(),
   ];
+  const nomeDe = (chave: string) =>
+    catsInfo.find((c) => c.chave === chave)?.nome ??
+    NOME_CAT[chave] ??
+    chave.charAt(0).toUpperCase() + chave.slice(1);
+  const corDe = (chave: string, idx: number) =>
+    catsInfo.find((c) => c.chave === chave)?.cor ?? COR_CAT[chave] ?? PALETA[idx % PALETA.length];
   const dadosCat = INICIAIS.map((ini, i) => {
     const linha: Record<string, number | string> = { m: ini };
     chavesCat.forEach((c) => {
-      linha[nomeCat(c)] = catAno[c]?.[i] ?? 0;
+      linha[nomeDe(c)] = catAno[c]?.[i] ?? 0;
     });
     return linha;
   });
@@ -329,8 +337,8 @@ export function PainelCruz({
                   <span className="flex flex-wrap items-center gap-3 text-xs font-semibold text-gray-600">
                     {chavesCat.map((c, i) => (
                       <span key={c} className="flex items-center gap-1">
-                        <span className="h-3 w-3 rounded-sm" style={{ background: corCat(c, i) }} />
-                        {nomeCat(c)}
+                        <span className="h-3 w-3 rounded-sm" style={{ background: corDe(c, i) }} />
+                        {nomeDe(c)}
                       </span>
                     ))}
                     <span className="text-blue-800">
@@ -352,7 +360,7 @@ export function PainelCruz({
                       label={{ value: "META 0", position: "insideBottomRight", fill: "#d32f2f", fontSize: 10 }}
                     />
                     {chavesCat.map((c, i) => (
-                      <Bar key={c} dataKey={nomeCat(c)} stackId="a" fill={corCat(c, i)} />
+                      <Bar key={c} dataKey={nomeDe(c)} stackId="a" fill={corDe(c, i)} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
@@ -365,12 +373,12 @@ export function PainelCruz({
                     <div
                       key={c}
                       className="rounded-md border-2 border-gray-200 bg-white p-2 text-center"
-                      style={{ borderLeftColor: corCat(c, i), borderLeftWidth: 6 }}
+                      style={{ borderLeftColor: corDe(c, i), borderLeftWidth: 6 }}
                     >
                       <div className="text-3xl font-bold leading-none text-gray-800">
                         {painel?.categorias_mes?.[c] ?? 0}
                       </div>
-                      <div className="text-xs font-bold uppercase text-gray-500">{nomeCat(c)}</div>
+                      <div className="text-xs font-bold uppercase text-gray-500">{nomeDe(c)}</div>
                     </div>
                   ))
                 ) : (
@@ -389,7 +397,7 @@ export function PainelCruz({
                         <b>
                           {String(o.dia).padStart(2, "0")} ·{" "}
                           {o.tipo === "acidente" ? "Acidente" : "Incidente"} ·{" "}
-                          {nomeCat(o.categoria ?? "outros")}:
+                          {nomeDe(o.categoria ?? "outros")}:
                         </b>{" "}
                         {o.descricao || "(sem descrição)"}{" "}
                         {o.observacoes && <i>({o.observacoes})</i>}

@@ -1,6 +1,7 @@
 // Montagem do "painel" (telas de TV): agrega as ocorrências + KPIs em um
 // único pacote de dados, pronto para o front desenhar.
 import {
+  listarCategorias,
   listarDatasOcorrencias,
   listarKpisAno,
   listarOcorrenciasAno,
@@ -97,8 +98,9 @@ export async function montarPainel(sistema: Sistema, ano: number, mes: number) {
     return { ...base, kpi_mes, kpi_ano };
   }
 
-  // Público flutuante: contagens por categoria (ano em 12 posições + mês) e
-  // resumo acidente × incidente do mês.
+  // Público flutuante: lista de categorias (nome/cor do banco) + contagens por
+  // categoria (ano em 12 posições + mês) e resumo acidente × incidente do mês.
+  const categorias = await listarCategorias();
   const categorias_ano: Record<string, number[]> = {};
   for (const o of occAno) {
     const cat = o.categoria ?? "outros";
@@ -112,5 +114,5 @@ export async function montarPainel(sistema: Sistema, ano: number, mes: number) {
     if (o.tipo === "acidente") resumo_tipo.acidente++;
     else resumo_tipo.incidente++;
   }
-  return { ...base, categorias_ano, categorias_mes, resumo_tipo };
+  return { ...base, categorias, categorias_ano, categorias_mes, resumo_tipo };
 }

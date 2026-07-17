@@ -75,6 +75,26 @@ export async function excluirOcorrencia(sistema: Sistema, id: number): Promise<v
   if (!res.ok) throw new Error(`Falha ao excluir ocorrência (${res.status})`);
 }
 
+// ===== Categorias do Público Flutuante =====
+
+export type Categoria = { chave: string; nome: string; cor: string };
+
+export async function listarCategorias(): Promise<Categoria[]> {
+  const res = await fetch(`${API_URL}/cipa/publico/categorias`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Falha ao listar categorias (${res.status})`);
+  return res.json();
+}
+
+export async function criarCategoria(nome: string): Promise<Categoria> {
+  const res = await fetch(`${API_URL}/cipa/publico/categorias`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nome }),
+  });
+  if (!res.ok) throw new Error(`Falha ao criar categoria (${res.status})`);
+  return res.json();
+}
+
 // ===== KPI (horas-homem / dias perdidos) — só trabalho =====
 
 export type Kpi = { horas_homem: number; dias_perdidos: number };
@@ -135,6 +155,7 @@ export type Painel = {
   kpi_mes?: KpiMesPainel;
   kpi_ano?: KpiAnoItem[];
   // só público:
+  categorias?: Categoria[];
   resumo_tipo?: { acidente: number; incidente: number };
   categorias_mes?: Record<string, number>;
   categorias_ano?: Record<string, number[]>;

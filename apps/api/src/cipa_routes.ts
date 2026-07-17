@@ -6,6 +6,8 @@ import {
   excluirOcorrencia,
   obterKpi,
   salvarKpi,
+  listarCategorias,
+  criarCategoria,
 } from "./cipa_db";
 import { montarPainel } from "./cipa_painel";
 
@@ -61,6 +63,18 @@ const cipaRoutes = new Elysia({ prefix: "/cipa" })
         dias_perdidos: t.Number(),
       }),
       detail: { summary: "Salva horas-homem e dias perdidos do mês", tags: ["cipa"] },
+    },
+  )
+  // Categorias do Público Flutuante (persistidas; "+ nova" cria aqui)
+  .get("/publico/categorias", () => listarCategorias(), {
+    detail: { summary: "Lista as categorias do público flutuante", tags: ["cipa"] },
+  })
+  .post(
+    "/publico/categorias",
+    ({ body }) => criarCategoria(body.nome),
+    {
+      body: t.Object({ nome: t.String({ minLength: 1 }) }),
+      detail: { summary: "Cria uma categoria (ou devolve a existente)", tags: ["cipa"] },
     },
   )
   // Listar ocorrências de um mês
