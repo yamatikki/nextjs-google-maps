@@ -50,16 +50,24 @@ function fmtBR(iso: string | null) {
 function ChartCard({
   titulo,
   legenda,
+  azul,
   children,
 }: {
   titulo: string;
   legenda?: React.ReactNode;
+  azul?: boolean; // Público Flutuante usa cartões azuis (como no modelo antigo)
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded-lg border-2 border-green-200 bg-green-50/40 p-2">
+    <div
+      className={`flex min-h-0 flex-1 flex-col rounded-lg border-2 p-2 ${
+        azul ? "border-blue-200 bg-blue-50/40" : "border-green-200 bg-green-50/40"
+      }`}
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-2 px-1">
-        <span className="text-sm font-bold text-green-900">{titulo}</span>
+        <span className={`text-sm font-bold ${azul ? "text-blue-900" : "text-green-900"}`}>
+          {titulo}
+        </span>
         {legenda}
       </div>
       <div className="min-h-0 flex-1">{children}</div>
@@ -110,6 +118,10 @@ export function PainelCruz({
     const t = setInterval(() => setAgora(new Date()), 30_000);
     return () => clearInterval(t);
   }, []);
+
+  // O painel do Público Flutuante usa os destaques em AZUL (fiel ao modelo
+  // antigo); a cruz em si continua verde — é a "Cruz Verde".
+  const azul = sistema === "publico";
 
   const occMes = painel?.ocorrencias_mes ?? [];
   const contagem = painel?.contagem ?? { atual: 0, recorde: 0, ultimo: null, inicio: "" };
@@ -221,10 +233,22 @@ export function PainelCruz({
           </div>
 
           {/* Dias consecutivos + recorde */}
-          <div className="flex w-full items-center gap-4 rounded-lg border-2 border-green-800 bg-gradient-to-br from-green-50 to-lime-50 px-4 py-2">
-            <div className="text-6xl font-bold leading-none text-green-700">{contagem.atual}</div>
+          <div
+            className={`flex w-full items-center gap-4 rounded-lg border-2 px-4 py-2 ${
+              azul
+                ? "border-blue-800 bg-gradient-to-br from-blue-50 to-sky-50"
+                : "border-green-800 bg-gradient-to-br from-green-50 to-lime-50"
+            }`}
+          >
+            <div
+              className={`text-6xl font-bold leading-none ${azul ? "text-blue-800" : "text-green-700"}`}
+            >
+              {contagem.atual}
+            </div>
             <div className="flex-1">
-              <div className="text-sm font-bold uppercase leading-tight text-green-900">
+              <div
+                className={`text-sm font-bold uppercase leading-tight ${azul ? "text-blue-900" : "text-green-900"}`}
+              >
                 {streakLabel}
               </div>
               <div className="text-sm font-bold text-orange-600">
@@ -333,6 +357,7 @@ export function PainelCruz({
               </div>
               <ChartCard
                 titulo="Ocorrências por mês"
+                azul
                 legenda={
                   <span className="flex flex-wrap items-center gap-3 text-xs font-semibold text-gray-600">
                     {chavesCat.map((c, i) => (
@@ -412,7 +437,11 @@ export function PainelCruz({
 
       {/* Rodapé */}
       <footer className="flex shrink-0 justify-between rounded-b-lg border-4 border-t-0 border-green-800 bg-white px-4 py-1 text-xs text-gray-400">
-        <span>Indicador de Segurança do Trabalho · Instituto Mauá de Tecnologia</span>
+        <span>
+          {azul
+            ? "Indicador de Público Flutuante · Segurança do Trabalho · Instituto Mauá de Tecnologia"
+            : "Indicador de Segurança do Trabalho · Instituto Mauá de Tecnologia"}
+        </span>
         <span>Atualizado: {atualizadoEm}</span>
       </footer>
     </div>
