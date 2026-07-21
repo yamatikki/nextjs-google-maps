@@ -15,8 +15,15 @@ import { obterPainel, type Painel, type Sistema } from "@/lib/cipa";
 import { MESES, montarCruz, diasNoMes, corDoDia, type CorDia } from "../../cipa/_shared/cruz";
 
 // Cores vivas das células (para leitura à distância, na TV).
-const COR: Record<CorDia, string> = {
+// O painel do trabalho usa a cruz verde; o do público flutuante, azul.
+const CORES_VERDE: Record<CorDia, string> = {
   green: "bg-green-600 text-green-100 border-green-800",
+  red: "bg-red-600 text-white border-red-800",
+  yellow: "bg-yellow-400 text-yellow-900 border-yellow-600",
+  blank: "bg-gray-200 text-gray-400 border-gray-300",
+};
+const CORES_AZUL: Record<CorDia, string> = {
+  green: "bg-blue-700 text-blue-100 border-blue-900", // dia sem ocorrência
   red: "bg-red-600 text-white border-red-800",
   yellow: "bg-yellow-400 text-yellow-900 border-yellow-600",
   blank: "bg-gray-200 text-gray-400 border-gray-300",
@@ -119,9 +126,10 @@ export function PainelCruz({
     return () => clearInterval(t);
   }, []);
 
-  // O painel do Público Flutuante usa os destaques em AZUL (fiel ao modelo
-  // antigo); a cruz em si continua verde — é a "Cruz Verde".
+  // O painel do Público Flutuante é AZUL (destaques e a própria cruz);
+  // o de Acidentes de Trabalho mantém a cruz verde clássica.
   const azul = sistema === "publico";
+  const CORES = azul ? CORES_AZUL : CORES_VERDE;
 
   const occMes = painel?.ocorrencias_mes ?? [];
   const contagem = painel?.contagem ?? { atual: 0, recorde: 0, ultimo: null, inicio: "" };
@@ -202,12 +210,13 @@ export function PainelCruz({
         >
           {/* A cruz dentro do círculo verde */}
           <div
-            className="flex shrink-0 items-center justify-center rounded-full border-8 border-green-900"
+            className={`flex shrink-0 items-center justify-center rounded-full border-8 ${azul ? "border-blue-950" : "border-green-900"}`}
             style={{
               width: "calc(var(--d) * 1.16)",
               height: "calc(var(--d) * 1.16)",
-              background:
-                "radial-gradient(circle at 42% 32%, #5cb85c 0%, #2e7d32 40%, #1b5e20 100%)",
+              background: azul
+                ? "radial-gradient(circle at 42% 32%, #60a5fa 0%, #1d4ed8 40%, #172554 100%)"
+                : "radial-gradient(circle at 42% 32%, #5cb85c 0%, #2e7d32 40%, #1b5e20 100%)",
             }}
           >
             <div
@@ -223,7 +232,7 @@ export function PainelCruz({
                   <div
                     key={i}
                     style={{ width: lado, height: lado, fontSize: "calc(var(--d) / 26)" }}
-                    className={`flex items-center justify-center rounded border-2 font-semibold ${COR[cor]} ${eHoje ? "ring-4 ring-yellow-300" : ""}`}
+                    className={`flex items-center justify-center rounded border-2 font-semibold ${CORES[cor]} ${eHoje ? "ring-4 ring-yellow-300" : ""}`}
                   >
                     {dia}
                   </div>
@@ -282,7 +291,7 @@ export function PainelCruz({
 
           {/* Legenda */}
           <div className="flex flex-wrap items-center justify-center gap-3 border-t border-gray-200 pt-2 text-xs font-semibold text-gray-600">
-            <span className="flex items-center gap-1.5"><span className="h-3.5 w-6 rounded border border-black/20 bg-green-600" /> Sem ocorrência</span>
+            <span className="flex items-center gap-1.5"><span className={`h-3.5 w-6 rounded border border-black/20 ${azul ? "bg-blue-700" : "bg-green-600"}`} /> Sem ocorrência</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-6 rounded border border-black/20 bg-red-600" /> {labelRed}</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-6 rounded border border-black/20 bg-yellow-400" /> {labelYellow}</span>
             <span className="flex items-center gap-1.5"><span className="h-3.5 w-6 rounded border border-black/20 bg-gray-200" /> Dia futuro</span>
