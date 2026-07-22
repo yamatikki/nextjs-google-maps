@@ -12,7 +12,7 @@ import {
 } from "recharts";
 
 import { obterPainel, type Painel, type Sistema } from "@/lib/cipa";
-import { MESES, montarCruz, diasNoMes, corDoDia, type CorDia } from "../../cipa/_shared/cruz";
+import { MESES, montarCruz, diasNoMes, corDoDia, type CorDia } from "../../seguranca/_shared/cruz";
 
 // Cores vivas das células (para leitura à distância, na TV).
 // O painel do trabalho usa a cruz verde; o do público flutuante, azul.

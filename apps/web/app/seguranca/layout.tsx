@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "CIPA | SmartCampus Mauá",
-  description: "Comissão Interna de Prevenção de Acidentes",
+  title: "Segurança do Trabalho | SmartCampus Mauá",
+  description:
+    "Segurança do Trabalho IMT - GMS — registro de todas as ocorrências de acidentes no IMT",
 };
 
 export default function CipaLayout({
@@ -23,10 +24,10 @@ export default function CipaLayout({
         />
         <div className="leading-tight">
           <p className="text-sm font-semibold text-gray-800">
-            CIPA · Instituto Mauá de Tecnologia
+            Segurança do Trabalho IMT - GMS
           </p>
           <p className="text-xs text-gray-500">
-            Dados organizados e coletados pela Segurança do Trabalho
+            Registro de todas as ocorrências de acidentes no IMT
           </p>
         </div>
       </header>

@@ -10,74 +10,66 @@ import {
   criarOcorrencia,
   atualizarOcorrencia,
   excluirOcorrencia,
-  obterKpi,
-  salvarKpi,
+  listarCategorias,
+  criarCategoria,
+  type Categoria,
   type Gravidade,
-  type Kpi,
   type Ocorrencia,
 } from "@/lib/cipa";
 
-const HORAS_PADRAO = 109340; // horas-homem padrão do mês, se não informado
+// ===== Tipos locais =====
+type TipoEvento = "acidente" | "incidente";
 
-export default function WorkPage() {
+export default function PublicPage() {
   const hoje = new Date();
 
   // ---- Estado principal ----
   const [ano, setAno] = useState(hoje.getFullYear());
   const [mes, setMes] = useState(hoje.getMonth() + 1);
-  const [aba, setAba] = useState<"cruz" | "freq">("cruz");
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [erro, setErro] = useState<string | null>(null);
-  // Horas-homem e dias perdidos do mês (persistidos no banco via API).
-  const [kpiMes, setKpiMes] = useState<Kpi>({ horas_homem: 0, dias_perdidos: 0 });
-  const [kpiMsg, setKpiMsg] = useState("");
 
   // ---- Estado do modal ----
   const [diaAberto, setDiaAberto] = useState<number | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
+  const [formTipo, setFormTipo] = useState<TipoEvento>("incidente");
   const [formGrav, setFormGrav] = useState<Gravidade>("red");
+  const [formCat, setFormCat] = useState<string>("");
   const [formDesc, setFormDesc] = useState("");
   const [formObs, setFormObs] = useState("");
 
-  // Carrega as ocorrências + horas/dias do mês a partir da API.
+  // Carrega as ocorrências do mês + as categorias a partir da API.
   const carregar = useCallback(async () => {
     try {
       setErro(null);
-      const [occ, kpi] = await Promise.all([
-        listarOcorrencias("trabalho", ano, mes),
-        obterKpi(ano, mes),
+      const [occ, cats] = await Promise.all([
+        listarOcorrencias("publico", ano, mes),
+        listarCategorias(),
       ]);
       setOcorrencias(occ);
-      setKpiMes(kpi);
+      setCategorias(cats);
     } catch (e) {
       console.error(e);
       setErro("Não foi possível carregar do servidor. A API (porta 3001) está no ar?");
     }
   }, [ano, mes]);
 
-  // Recarrega sempre que o ano/mês muda (e na primeira vez que a tela abre).
   useEffect(() => {
     carregar();
   }, [carregar]);
 
   const ocorrenciasDoDia = (dia: number) => ocorrencias.filter((o) => o.dia === dia);
+  const nomeCategoria = (chave: string | null) =>
+    categorias.find((c) => c.chave === chave)?.nome ?? chave ?? "—";
 
-  // Taxas calculadas a partir da cruz (padrão de segurança do trabalho, meta 0)
-  const calc = useMemo(() => {
-    const com = ocorrencias.filter((o) => o.gravidade === "red").length;
-    const sem = ocorrencias.filter((o) => o.gravidade === "yellow").length;
-    const total = com + sem;
-    const horas = kpiMes.horas_homem || HORAS_PADRAO;
-    const taxa = (n: number) => (horas ? +((n * 1_000_000) / horas).toFixed(2) : 0);
-    return {
-      com, sem, total,
-      freq: taxa(total),
-      freqCom: taxa(com),
-      freqSem: taxa(sem),
-      grav: taxa(kpiMes.dias_perdidos), // taxa de gravidade usa os dias perdidos
-    };
-  }, [ocorrencias, kpiMes]);
+  // Resumo do mês (acidentes × incidentes)
+  const resumo = useMemo(() => {
+    const acid = ocorrencias.filter((o) => o.tipo === "acidente").length;
+    const inc = ocorrencias.filter((o) => o.tipo === "incidente").length;
+    return { acid, inc };
+  }, [ocorrencias]);
 
   // ---- Ações do modal ----
   function abrirDia(dia: number) {
@@ -92,30 +84,51 @@ export default function WorkPage() {
   }
   function novo() {
     setEditId(null);
+    setFormTipo("incidente");
     setFormGrav("red");
+    setFormCat(categorias[0]?.chave ?? "");
     setFormDesc("");
     setFormObs("");
     setMostrarForm(true);
   }
   function editar(o: Ocorrencia) {
     setEditId(o.id);
+    setFormTipo(o.tipo === "acidente" ? "acidente" : "incidente");
     setFormGrav(o.gravidade);
+    setFormCat(o.categoria ?? categorias[0]?.chave ?? "");
     setFormDesc(o.descricao);
     setFormObs(o.observacoes);
     setMostrarForm(true);
+  }
+  async function novaCategoria() {
+    const nome = prompt("Nome da nova categoria:");
+    if (!nome || !nome.trim()) return;
+    try {
+      // O servidor cria (ou devolve a existente) e ela fica salva no banco.
+      const nova = await criarCategoria(nome.trim());
+      setCategorias((prev) =>
+        prev.some((c) => c.chave === nova.chave) ? prev : [...prev, nova],
+      );
+      setFormCat(nova.chave);
+    } catch (e) {
+      console.error(e);
+      setErro("Não foi possível criar a categoria.");
+    }
   }
   async function salvar() {
     if (diaAberto === null) return;
     const dados = {
       ano, mes, dia: diaAberto,
       gravidade: formGrav,
+      tipo: formTipo,
+      categoria: formCat,
       descricao: formDesc,
       observacoes: formObs,
     };
     try {
-      if (editId) await atualizarOcorrencia("trabalho", editId, dados);
-      else await criarOcorrencia("trabalho", dados);
-      await carregar(); // recarrega do banco para refletir a mudança
+      if (editId) await atualizarOcorrencia("publico", editId, dados);
+      else await criarOcorrencia("publico", dados);
+      await carregar();
       setMostrarForm(false);
       setEditId(null);
     } catch (e) {
@@ -126,57 +139,44 @@ export default function WorkPage() {
   async function excluir(id: number) {
     if (!confirm("Excluir este registro?")) return;
     try {
-      await excluirOcorrencia("trabalho", id);
+      await excluirOcorrencia("publico", id);
       await carregar();
     } catch (e) {
       console.error(e);
       setErro("Não foi possível excluir.");
     }
   }
-  function setKpiCampo(campo: "horas_homem" | "dias_perdidos", valor: number) {
-    setKpiMes((prev) => ({ ...prev, [campo]: valor }));
-  }
-  async function salvarHorasDias() {
-    try {
-      await salvarKpi({ ano, mes, ...kpiMes });
-      setKpiMsg("✓ Salvo!");
-      setTimeout(() => setKpiMsg(""), 2500);
-    } catch (e) {
-      console.error(e);
-      setErro("Não foi possível salvar horas/dias.");
-    }
-  }
 
   return (
     <main className="mx-auto w-full max-w-4xl p-6">
-      <Link href="/cipa" className="text-sm font-semibold text-green-700 hover:underline">
-        ← Voltar para a CIPA
+      <Link href="/seguranca" className="text-sm font-semibold text-blue-700 hover:underline">
+        ← Voltar para Segurança do Trabalho
       </Link>
 
       {/* Cabeçalho + seletores */}
       <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-green-900">🟢 Acidentes de Trabalho — Digitação</h1>
-          <p className="text-sm text-green-700">
-            Marque cada acidente no dia da cruz. Pode haver vários no mesmo dia.
+          <h1 className="text-2xl font-bold text-blue-900">🔵 Público Flutuante — Digitação</h1>
+          <p className="text-sm text-blue-700">
+            Clique no dia, classifique (acidente/incidente), escolha a gravidade e o tipo, e descreva.
           </p>
         </div>
         <div className="flex items-end gap-3">
           <div>
-            <label className="mb-1 block text-sm font-semibold text-green-800">Ano</label>
+            <label className="mb-1 block text-sm font-semibold text-blue-800">Ano</label>
             <input
               type="number"
               value={ano}
               onChange={(e) => setAno(+e.target.value)}
-              className="w-24 rounded-md border border-green-300 p-2"
+              className="w-24 rounded-md border border-blue-300 p-2"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-semibold text-green-800">Mês</label>
+            <label className="mb-1 block text-sm font-semibold text-blue-800">Mês</label>
             <select
               value={mes}
               onChange={(e) => setMes(+e.target.value)}
-              className="w-36 rounded-md border border-green-300 p-2"
+              className="w-36 rounded-md border border-blue-300 p-2"
             >
               {MESES.map((m, i) => (
                 <option key={i} value={i + 1}>{m}</option>
@@ -184,14 +184,14 @@ export default function WorkPage() {
             </select>
           </div>
           <Link
-            href={`/cipa/relatorio/trabalho?ano=${ano}&mes=${mes}`}
+            href={`/seguranca/relatorio/publico?ano=${ano}&mes=${mes}`}
             target="_blank"
             className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
           >
             📄 Relatório
           </Link>
           <Link
-            href={`/painel/trabalho?ano=${ano}&mes=${mes}`}
+            href={`/painel/publico?ano=${ano}&mes=${mes}`}
             target="_blank"
             className="rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
           >
@@ -207,106 +207,30 @@ export default function WorkPage() {
         </div>
       )}
 
-      {/* Abas */}
-      <div className="mt-4 flex flex-wrap gap-2">
-        {([["cruz", "1 · Cruz Verde"], ["freq", "2 · Frequência × Gravidade"]] as const).map(
-          ([id, texto]) => (
-            <button
-              key={id}
-              onClick={() => setAba(id)}
-              className={`rounded-t-md border-2 px-4 py-2 text-sm font-semibold transition-colors ${aba === id
-                  ? "border-green-200 border-b-white bg-white text-green-900"
-                  : "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
-                }`}
-            >
-              {texto}
-            </button>
-          ),
-        )}
+      {/* Card da cruz */}
+      <div className="mt-4 rounded-xl border-2 border-blue-200 bg-white p-5">
+        <p className="mb-1 text-sm font-semibold text-blue-800">
+          Cruz Verde — Público Flutuante — clique num dia para ver/adicionar
+        </p>
+        <p className="mb-3 text-sm text-gray-500">
+          Cada registro é um <b>acidente</b> ou <b>incidente</b> (Grave/Leve + tipo + descrição).
+          Use <b>+ nova</b> no formulário para criar uma categoria.
+        </p>
+
+        {/* A cruz (componente compartilhado) */}
+        <CruzGrid ano={ano} mes={mes} ocorrenciasMes={ocorrencias} onDiaClick={abrirDia} />
+
+        {/* Legenda + resumo */}
+        <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs text-gray-600">
+          <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-green-700" /> Sem ocorrência</span>
+          <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-red-600" /> Grave</span>
+          <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-yellow-400" /> Leve</span>
+          <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-gray-200" /> Dia futuro</span>
+        </div>
+        <p className="mt-2 text-center text-sm text-blue-800">
+          No mês: <b>{resumo.acid}</b> acidente(s) · <b>{resumo.inc}</b> incidente(s)
+        </p>
       </div>
-
-      {/* Aba: Cruz Verde */}
-      {aba === "cruz" && (
-        <div className="rounded-b-xl rounded-tr-xl border-2 border-green-200 bg-white p-5">
-          <p className="mb-3 text-sm text-gray-500">
-            Clique num dia para ver/adicionar acidentes. A cor do dia segue o caso mais grave.
-            Os números de Frequência são contados automaticamente a partir daqui.
-          </p>
-
-          {/* A cruz (componente compartilhado) */}
-          <CruzGrid ano={ano} mes={mes} ocorrenciasMes={ocorrencias} onDiaClick={abrirDia} />
-
-          {/* Legenda */}
-          <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs text-gray-600">
-            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-green-700" /> Sem acidente</span>
-            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-red-600" /> Com afastamento</span>
-            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-yellow-400" /> Sem afastamento</span>
-            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-gray-200" /> Dia futuro</span>
-          </div>
-        </div>
-      )}
-
-      {/* Aba: Frequência × Gravidade */}
-      {aba === "freq" && (
-        <div className="rounded-b-xl rounded-tr-xl border-2 border-green-200 bg-white p-6">
-          <p className="mb-3 text-sm text-gray-500">
-            Os acidentes (c/ e s/ afastamento) vêm da <b>cruz</b>. Aqui você informa apenas as
-            horas-homem e os dias perdidos do mês.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <div className="min-w-[150px] flex-1">
-              <label className="mb-1 block text-sm font-semibold text-green-800">
-                Horas-homem trabalhadas no mês
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={kpiMes.horas_homem || ""}
-                onChange={(e) => setKpiCampo("horas_homem", +e.target.value)}
-                placeholder={`${HORAS_PADRAO}`}
-                className="w-full rounded-md border border-green-300 p-2"
-              />
-            </div>
-            <div className="min-w-[150px] flex-1">
-              <label className="mb-1 block text-sm font-semibold text-green-800">
-                Dias perdidos no mês
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={kpiMes.dias_perdidos || ""}
-                onChange={(e) => setKpiCampo("dias_perdidos", +e.target.value)}
-                className="w-full rounded-md border border-green-300 p-2"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-md border border-dashed border-green-300 bg-green-50 p-4">
-            <h4 className="mb-2 text-sm font-bold text-green-900">CALCULADO A PARTIR DA CRUZ (meta 0)</h4>
-            <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-              <div>Acidentes c/ afastamento: <b className="text-green-900">{calc.com}</b></div>
-              <div>Acidentes s/ afastamento: <b className="text-green-900">{calc.sem}</b></div>
-              <div>Total de acidentes: <b className="text-green-900">{calc.total}</b></div>
-              <div>Taxa de Frequência (total): <b className="text-green-900">{calc.freq}</b></div>
-              <div>Taxa Freq. c/ afastamento: <b className="text-green-900">{calc.freqCom}</b></div>
-              <div>Taxa Freq. s/ afastamento: <b className="text-green-900">{calc.freqSem}</b></div>
-              <div>Taxa de Gravidade: <b className="text-green-900">{calc.grav}</b></div>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center gap-3">
-            <button
-              onClick={salvarHorasDias}
-              className="rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:brightness-95"
-            >
-              Salvar horas/dias
-            </button>
-            {kpiMsg && <span className="text-sm font-semibold text-green-700">{kpiMsg}</span>}
-          </div>
-          <p className="mt-3 text-xs text-gray-400">
-            As taxas se atualizam sozinhas conforme você marca a cruz e informa horas/dias.
-          </p>
-        </div>
-      )}
 
       {/* Modal do dia */}
       {diaAberto !== null && (
@@ -338,7 +262,8 @@ export default function WorkPage() {
                         />
                         <div className="flex-1 text-sm text-gray-700">
                           <b className="text-gray-800">
-                            {o.gravidade === "red" ? "Com afastamento" : "Sem afastamento"}
+                            {o.tipo === "acidente" ? "Acidente" : "Incidente"} ·{" "}
+                            {o.gravidade === "red" ? "Grave" : "Leve"} · {nomeCategoria(o.categoria)}
                           </b>
                           <br />
                           {o.descricao || <i className="text-gray-400">(sem descrição)</i>}
@@ -379,23 +304,60 @@ export default function WorkPage() {
             {/* Formulário de adicionar/editar */}
             {mostrarForm && (
               <div>
-                <label className="mb-1 mt-2 block text-sm font-semibold text-gray-600">Gravidade</label>
+                {/* 1) Tipo: acidente ou incidente */}
+                <label className="mb-1 mt-2 block text-sm font-semibold text-gray-600">
+                  Foi acidente ou incidente?
+                </label>
+                <div className="mb-3 flex gap-2">
+                  {(["acidente", "incidente"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setFormTipo(t)}
+                      className={`flex-1 rounded-md border-2 py-2 text-sm font-semibold capitalize ${formTipo === t ? "border-blue-600 bg-blue-50 text-blue-800" : "border-gray-300 bg-gray-50 text-gray-600"}`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 2) Gravidade: Grave / Leve */}
+                <label className="mb-1 block text-sm font-semibold text-gray-600">Gravidade</label>
                 <div className="mb-3 flex gap-2">
                   <button
                     onClick={() => setFormGrav("red")}
                     className={`flex-1 rounded-md border-2 py-2 text-sm font-semibold ${formGrav === "red" ? "border-red-600 bg-red-50 text-red-800" : "border-gray-300 bg-gray-50 text-gray-600"}`}
                   >
-                    Com afastamento
+                    Grave
                   </button>
                   <button
                     onClick={() => setFormGrav("yellow")}
                     className={`flex-1 rounded-md border-2 py-2 text-sm font-semibold ${formGrav === "yellow" ? "border-yellow-500 bg-yellow-50 text-yellow-800" : "border-gray-300 bg-gray-50 text-gray-600"}`}
                   >
-                    Sem afastamento
+                    Leve
                   </button>
                 </div>
 
-                <label className="mb-1 block text-sm font-semibold text-gray-600">Descrição do ocorrido</label>
+                {/* 3) Categoria (com + nova) */}
+                <label className="mb-1 block text-sm font-semibold text-gray-600">Tipo</label>
+                <div className="mb-1 flex items-end gap-2">
+                  <select
+                    value={formCat}
+                    onChange={(e) => setFormCat(e.target.value)}
+                    className="flex-1 rounded-md border border-gray-300 p-2 text-sm"
+                  >
+                    {categorias.map((c) => (
+                      <option key={c.chave} value={c.chave}>{c.nome}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={novaCategoria}
+                    className="whitespace-nowrap rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white"
+                  >
+                    + nova
+                  </button>
+                </div>
+
+                <label className="mb-1 mt-2 block text-sm font-semibold text-gray-600">Descrição do ocorrido</label>
                 <textarea
                   value={formDesc}
                   onChange={(e) => setFormDesc(e.target.value)}
@@ -414,7 +376,7 @@ export default function WorkPage() {
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={salvar}
-                    className="rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:brightness-95"
+                    className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:brightness-95"
                   >
                     Salvar
                   </button>

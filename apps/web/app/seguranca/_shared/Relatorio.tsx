@@ -57,7 +57,7 @@ export function Relatorio({
   const categorias = painel?.categorias ?? [];
   const catMes = painel?.categorias_mes ?? {};
   const rt = painel?.resumo_tipo ?? { acidente: 0, incidente: 0 };
-  const voltarPara = sistema === "trabalho" ? "/cipa/work" : "/cipa/public";
+  const voltarPara = sistema === "trabalho" ? "/seguranca/work" : "/seguranca/public";
 
   // Avaliação automática do mês (mesma regra do app antigo):
   // NEGATIVO se houve caso grave/c-afastamento; ATENÇÃO se só leves; POSITIVO se nenhum.

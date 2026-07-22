@@ -5,10 +5,10 @@ import type { Sistema } from "@/lib/cipa";
 import { Relatorio } from "../../_shared/Relatorio";
 
 export const metadata: Metadata = {
-  title: "Relatório Mensal | CIPA — SmartCampus Mauá",
+  title: "Relatório Mensal | Segurança do Trabalho — SmartCampus Mauá",
 };
 
-// Rota dinâmica: [sistema] vira /cipa/relatorio/trabalho e /cipa/relatorio/publico.
+// Rota dinâmica: [sistema] vira /seguranca/relatorio/trabalho e /seguranca/relatorio/publico.
 // Aceita ?ano=2026&mes=5 para relatórios de meses anteriores.
 // (No Next 16, params e searchParams são Promises — por isso os awaits.)
 export default async function RelatorioPage({
